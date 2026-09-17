@@ -1,7 +1,6 @@
 import type { Env } from "./env";
-import {
-  TelegramWebhookController,
-} from "./telegram/webhook.controller";
+import { TelegramWebhookController } from "./telegram/webhook.controller";
+import { homePage, privacyPage, termsPage } from "./public/public-pages";
 
 export default {
   async fetch(
@@ -9,6 +8,27 @@ export default {
     env: Env,
   ): Promise<Response> {
     const url = new URL(request.url);
+
+		if (
+      request.method === "GET" &&
+      url.pathname === "/"
+    ) {
+      return homePage();
+    }
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/privacy"
+    ) {
+      return privacyPage();
+    }
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/terms"
+    ) {
+      return termsPage();
+    }
 
     if (
       request.method === "GET" &&

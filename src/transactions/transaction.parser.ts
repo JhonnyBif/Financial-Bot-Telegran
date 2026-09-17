@@ -105,5 +105,8 @@ function normalizeDescription(parts: string[]): string {
     throw new Error("Descrição não informada.");
   }
 
-  return description;
+  return (
+    description.charAt(0).toUpperCase() +
+    description.slice(1)
+  );
 }

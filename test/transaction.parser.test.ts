@@ -175,5 +175,14 @@ describe("transaction parser", () => {
 			expect(result.source).toBe("Nubank Pix PJ");
 			expect(result.description).toBe("contabilidade");
 		});
+
+		it("capitalizes the first letter of the description", () => {
+			const result = parseTransaction(
+				"15 nc geladeira",
+				FIXED_NOW,
+			);
+
+			expect(result.description).toBe("Geladeira");
+		});
   });
 });
