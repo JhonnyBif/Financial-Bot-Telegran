@@ -7,13 +7,18 @@
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "google:oauth": "tsx scripts/google-oauth.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.4",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.6",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.2",
     "vitest": "~3.2.0",
     "wrangler": "^4.99.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }

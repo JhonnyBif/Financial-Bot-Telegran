@@ -1,0 +1,9 @@
+export type Env = {
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_WEBHOOK_SECRET: string;
+  ALLOWED_TELEGRAM_USER_IDS: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_REFRESH_TOKEN: string;
+  GOOGLE_SHEET_ID: string;
+};
