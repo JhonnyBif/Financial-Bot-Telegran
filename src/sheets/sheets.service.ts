@@ -60,6 +60,7 @@ export class SheetsService {
 
 	private async findFirstEmptyExpenseRow(
 		sheetName: string,
+		sheetId: number,
 	): Promise<number> {
 		const range =
 			`${this.quoteSheetName(sheetName)}!` +
@@ -67,16 +68,38 @@ export class SheetsService {
 
 		const values = await this.readRange(range);
 
-		for (
-			let index = 0;
-			index < MAX_DATA_ROW - FIRST_DATA_ROW + 1;
-			index++
-		) {
+		for (let index = 0; index < values.length; index++) {
+			const rowNumber = FIRST_DATA_ROW + index;
 			const row = values[index] ?? [];
 
 			const description = row[0];
 			const amount = row[1];
 			const date = row[2];
+
+			const label = String(description ?? "")
+				.trim()
+				.toLowerCase();
+
+			if (label === "gasto") {
+				const nextLabel = String(
+					values[index + 1]?.[0] ?? "",
+				)
+					.trim()
+					.toLowerCase();
+
+				if (nextLabel !== "restante") {
+					throw new Error(
+						`A linha de 'Restante' não foi encontrada após 'Gasto' na aba '${sheetName}'.`,
+					);
+				}
+
+				await this.moveExpenseSummaryDown(
+					sheetId,
+					rowNumber,
+				);
+
+				return rowNumber;
+			}
 
 			const isEmpty =
 				this.isEmptyCell(description) &&
@@ -84,12 +107,12 @@ export class SheetsService {
 				this.isEmptyCell(date);
 
 			if (isEmpty) {
-				return FIRST_DATA_ROW + index;
+				return rowNumber;
 			}
 		}
 
 		throw new Error(
-			`Não há linhas livres para despesas na aba '${sheetName}'.`,
+			`Não foi possível encontrar espaço para uma nova despesa na aba '${sheetName}'.`,
 		);
 	}
 
@@ -101,6 +124,7 @@ export class SheetsService {
 		const row =
 			await this.findFirstEmptyExpenseRow(
 				sheetName,
+				sheetId,
 			);
 
 		const range =
@@ -401,6 +425,165 @@ export class SheetsService {
 
 			throw new Error(
 				`Erro ao formatar células: ${error}`,
+			);
+		}
+	}
+
+	private async moveExpenseSummaryDown(
+		sheetId: number,
+		gastoRow: number,
+	): Promise<void> {
+		const restanteRow = gastoRow + 1;
+
+		const newGastoRow = gastoRow + 1;
+		const newRestanteRow = gastoRow + 2;
+
+		const accessToken =
+			await this.authService.getAccessToken();
+
+		const response = await fetch(
+			`https://sheets.googleapis.com/v4/spreadsheets/` +
+				`${this.env.GOOGLE_SHEET_ID}:batchUpdate`,
+			{
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${accessToken}`,
+					"content-type": "application/json",
+				},
+
+				body: JSON.stringify({
+					requests: [
+						// Primeiro move Restante para baixo.
+						{
+							cutPaste: {
+								source: {
+									sheetId,
+
+									startRowIndex: restanteRow - 1,
+									endRowIndex: restanteRow,
+
+									startColumnIndex: 1,
+									endColumnIndex: 3,
+								},
+
+								destination: {
+									sheetId,
+									rowIndex: newRestanteRow - 1,
+									columnIndex: 1,
+								},
+
+								pasteType: "PASTE_NORMAL",
+							},
+						},
+
+						// Depois move Gasto para baixo.
+						{
+							cutPaste: {
+								source: {
+									sheetId,
+
+									startRowIndex: gastoRow - 1,
+									endRowIndex: gastoRow,
+
+									startColumnIndex: 1,
+									endColumnIndex: 3,
+								},
+
+								destination: {
+									sheetId,
+									rowIndex: newGastoRow - 1,
+									columnIndex: 1,
+								},
+
+								pasteType: "PASTE_NORMAL",
+							},
+						},
+
+						// A antiga linha de Gasto agora será uma despesa.
+						// Copia apenas o formato da despesa anterior.
+						{
+							copyPaste: {
+								source: {
+									sheetId,
+
+									startRowIndex: gastoRow - 2,
+									endRowIndex: gastoRow - 1,
+
+									startColumnIndex: 0,
+									endColumnIndex: 4,
+								},
+
+								destination: {
+									sheetId,
+
+									startRowIndex: gastoRow - 1,
+									endRowIndex: gastoRow,
+
+									startColumnIndex: 0,
+									endColumnIndex: 4,
+								},
+
+								pasteType: "PASTE_FORMAT",
+								pasteOrientation: "NORMAL",
+							},
+						},
+
+						// Atualiza Gasto e Restante com o novo limite.
+						{
+							updateCells: {
+								start: {
+									sheetId,
+									rowIndex: newGastoRow - 1,
+									columnIndex: 1,
+								},
+
+								rows: [
+									{
+										values: [
+											{
+												userEnteredValue: {
+													stringValue: "Gasto",
+												},
+											},
+											{
+												userEnteredValue: {
+													formulaValue:
+														`=SUM(C${FIRST_DATA_ROW}:C${gastoRow})`,
+												},
+											},
+										],
+									},
+
+									{
+										values: [
+											{
+												userEnteredValue: {
+													stringValue: "Restante",
+												},
+											},
+											{
+												userEnteredValue: {
+													formulaValue:
+														`=K5+K3-SUM(C${FIRST_DATA_ROW}:C${gastoRow})`,
+												},
+											},
+										],
+									},
+								],
+
+								fields: "userEnteredValue",
+							},
+						},
+					],
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const error = await response.text();
+
+			throw new Error(
+				`Erro ao mover resumo de gastos: ${error}`,
 			);
 		}
 	}
